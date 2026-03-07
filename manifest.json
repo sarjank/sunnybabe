@@ -2,7 +2,7 @@
   "name": "SunnyBabe Weather",
   "short_name": "SunnyBabe",
   "description": "Live weather for your cities — SunnyBabe",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0d1b2a",

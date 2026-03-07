@@ -1,6 +1,9 @@
 [build]
   publish = "."
 
+[functions]
+  directory = "netlify/functions"
+
 # Service worker must never be cached so phones always get the latest version
 [[headers]]
   for = "/sw.js"

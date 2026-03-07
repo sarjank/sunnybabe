@@ -2,13 +2,13 @@
 // Strategy: network-first for HTML/JS (always fresh), cache-first for images.
 // CACHE_NAME is auto-bumped by deploy.py on every deploy.
 
-const CACHE_NAME = 'sunnybabe-20260307161118';
+const CACHE_NAME = 'sunnybabe-20260307180611';
 const APP_SHELL  = [
-  '/',
-  '/index.html',
-  '/sponsoredLinks.js',
-  '/bratzDoll.png',
-  '/manifest.json',
+  './',
+  './index.html',
+  './sponsoredLinks.js',
+  './bratzDoll.png',
+  './manifest.json',
 ];
 
 // Install: pre-cache the app shell
@@ -33,9 +33,10 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Weather API: always live, never cache
+  // Weather API & serverless functions: always live, never cache locally (CDN handles it)
   if (url.hostname === 'api.openweathermap.org' ||
-      url.hostname === 'api.web3forms.com') {
+      url.hostname === 'api.web3forms.com' ||
+      url.pathname.startsWith('/.netlify/functions/')) {
     event.respondWith(fetch(event.request));
     return;
   }
