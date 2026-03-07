@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>SunnyBabe Weather</title>
+
+  <!-- PWA / iOS home-screen support -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0d1b2a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SunnyBabe" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <script src="sponsoredLinks.js"></script>
+
+  <!-- Google Analytics 4 (Phase 9) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-JRE25EFFCR"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-JRE25EFFCR', { send_page_view: true });
+  </script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #0d1b2a 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #e8eaf0;
+      /* iOS safe area support */
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    header {
+      padding: 1.6rem 2.5rem 1.3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      /* account for iOS notch / Dynamic Island */
+      padding-top: calc(1.6rem + env(safe-area-inset-top));
+      padding-left: max(2.5rem, env(safe-area-inset-left));
+      padding-right: max(2.5rem, env(safe-area-inset-right));
+    }
+
+    .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
+    .logo span { color: #5ba4f5; }
+
+    .add-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #5ba4f5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem 1.1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 44px; /* touch target */
+      touch-action: manipulation;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .add-btn:hover { background: #4490e0; }
+    .add-btn:active { transform: scale(0.97); }
+
+    .grid {
+      display: grid;
+      /* ~255px min makes cards narrower and naturally more vertical */
+      grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+      gap: 1.2rem;
+      padding: 1.6rem 2rem;
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    /* ---- Cards ---- */
+    .card {
+      position: relative;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 18px;
+      padding: 1.6rem 1.6rem 1.2rem;
+      backdrop-filter: blur(12px);
+      transition: transform 0.2s, box-shadow 0.2s;
+      overflow: hidden;
+    }
+
+    .card:not(.loading):hover {
+      transform: translateY(-3px);
+      box-shadow: 0 14px 44px rgba(0,0,0,0.38);
+    }
+
+    .card-glow {
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 130px; height: 130px;
+      border-radius: 50%;
+      opacity: 0.12;
+      pointer-events: none;
+    }
+
+    .card.sunny  .card-glow { background: #fbbf24; }
+    .card.cloudy .card-glow { background: #94a3b8; }
+    .card.rainy  .card-glow { background: #60a5fa; }
+    .card.snowy  .card-glow { background: #bfdbfe; }
+    .card.stormy .card-glow { background: #818cf8; }
+    .card.humid  .card-glow { background: #34d399;  }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.35rem;
+    }
+
+    .city-name { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; line-height: 1.3; }
+    .city-country { font-size: 0.78rem; color: #94a3b8; margin-top: 0.1rem; }
+
+    /* Quip */
+    .quip {
+      font-size: 0.76rem;
+      font-style: italic;
+      margin-bottom: 0.85rem;
+      padding: 0.3rem 0.5rem;
+      border-radius: 6px;
+      line-height: 1.4;
+    }
+
+    .quip.good    { color: #86efac; background: rgba(134,239,172,0.08); }
+    .quip.warn    { color: #fca5a5; background: rgba(252,165,165,0.08); }
+    .quip.neutral { color: #93c5fd; background: rgba(147,197,253,0.08); }
+
+    .delete-btn {
+      background: transparent;
+      border: none;
+      color: #475569;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 0.3rem 0.4rem;
+      border-radius: 4px;
+      line-height: 1;
+      min-width: 36px;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+      transition: color 0.2s, background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .delete-btn:hover { color: #f87171; background: rgba(248,113,113,0.1); }
+
+    .weather-icon { font-size: 2.8rem; line-height: 1; margin-bottom: 0.5rem; }
+
+    .condition {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 0.75rem;
+    }
+
+    .temps { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.85rem; }
+    .temp-f { font-size: 1.9rem; font-weight: 700; color: #f1f5f9; }
+    .temp-divider { font-size: 1.1rem; color: rgba(255,255,255,0.2); }
+    .temp-c { font-size: 1.9rem; font-weight: 300; color: #94a3b8; }
+
+    .temp-labels {
+      display: flex;
+      gap: 0.7rem;
+      font-size: 0.68rem;
+      color: #475569;
+      margin-top: -0.65rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .details {
+      display: flex;
+      gap: 1rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      margin-bottom: 0.85rem;
+    }
+
+    .detail-item { display: flex; flex-direction: column; gap: 0.12rem; }
+    .detail-label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: #475569; }
+    .detail-value { font-size: 0.85rem; font-weight: 600; color: #cbd5e1; }
+
+    /* Forecast chart */
+    .forecast-section {
+      padding-top: 0.7rem;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .forecast-label {
+      font-size: 0.64rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #334155;
+      margin-bottom: 0.4rem;
+    }
+
+    .forecast-chart { width: 100%; display: block; overflow: visible; }
+
+    /* Loading skeleton */
+    @keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.6; } }
+
+    .card.loading { opacity: 0.8; }
+    .skeleton { background: rgba(255,255,255,0.1); border-radius: 6px; animation: pulse 1.5s ease-in-out infinite; }
+    .sk-name { height: 13px; width: 55%; margin-bottom: 7px; }
+    .sk-sub  { height: 9px;  width: 30%; }
+    .sk-icon { height: 45px; width: 45px; border-radius: 50%; margin: 0.9rem 0 0.5rem; }
+    .sk-cond { height: 9px;  width: 40%; margin-bottom: 0.8rem; }
+    .sk-temp { height: 30px; width: 65%; margin-bottom: 1rem; }
+    .sk-bar  { height: 7px;  width: 100%; }
+    .sk-bar2 { height: 60px; width: 100%; margin-top: 0.7rem; }
+
+    /* Error */
+    .error-body { margin-top: 1rem; font-size: 0.85rem; color: #f87171; }
+
+    /* ---- Modal ---- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #1e2d3d;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 380px;
+      max-width: calc(100vw - 2rem);
+    }
+
+    .modal h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1.2rem; color: #f1f5f9; }
+
+    .input-wrapper { position: relative; margin-bottom: 0.5rem; }
+
+    .modal input {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 0.7rem 1rem;
+      font-size: 0.95rem;
+      color: #f1f5f9;
+      outline: none;
+      transition: border-color 0.2s, border-radius 0.15s;
+    }
+
+    .modal input:focus { border-color: #5ba4f5; }
+    .modal input.has-suggestions { border-radius: 8px 8px 0 0; border-color: #5ba4f5; }
+    .modal input::placeholder { color: #475569; }
+
+    .suggestion-list {
+      position: absolute;
+      top: 100%; left: 0; right: 0;
+      background: #1a2e42;
+      border: 1px solid #5ba4f5;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      overflow: hidden;
+      z-index: 10;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .suggestion-item {
+      padding: 0.6rem 1rem;
+      font-size: 0.88rem;
+      color: #cbd5e1;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+    }
+
+    .suggestion-item:hover { background: rgba(91,164,245,0.18); color: #f1f5f9; }
+    .suggestion-item.no-result { color: #475569; cursor: default; font-style: italic; }
+    .suggestion-item.searching { color: #5ba4f5; cursor: default; }
+    .suggestion-flag { font-size: 0.8rem; color: #475569; margin-left: auto; }
+
+    .modal-hint { font-size: 0.75rem; color: #475569; margin-bottom: 1rem; }
+
+    .modal-actions { display: flex; gap: 0.7rem; justify-content: flex-end; margin-top: 1rem; }
+
+    .btn-cancel {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #94a3b8;
+      border-radius: 8px;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-cancel:hover { background: rgba(255,255,255,0.05); }
+
+    .btn-add {
+      background: #5ba4f5;
+      border: none;
+      color: #fff;
+      border-radius: 8px;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+
+    .btn-add:hover { background: #4490e0; }
+    .btn-add:disabled { opacity: 0.35; cursor: default; }
+
+    .error-msg { font-size: 0.8rem; color: #f87171; min-height: 1rem; }
+
+    footer { text-align: center; padding: 1.5rem; color: #334155; font-size: 0.78rem; }
+
+    /* ── Feedback button ───────────────────────────────────────────────────── */
+    .feedback-fab {
+      position: fixed; bottom: calc(1.4rem + env(safe-area-inset-bottom));
+      left: 1.2rem; z-index: 800;
+      width: 46px; height: 46px; border-radius: 50%;
+      background: rgba(30,41,59,0.92); border: 1px solid rgba(99,102,241,0.35);
+      color: #a5b4fc; font-size: 1.25rem;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+      transition: background 0.18s, transform 0.18s;
+    }
+    .feedback-fab:hover { background: rgba(99,102,241,0.25); transform: scale(1.08); }
+
+    /* ── Feedback modal ────────────────────────────────────────────────────── */
+    .fb-overlay {
+      position: fixed; inset: 0; z-index: 900;
+      display: flex; align-items: flex-end; justify-content: center;
+      background: rgba(0,0,0,0); pointer-events: none;
+      transition: background 0.25s;
+    }
+    .fb-overlay.open { background: rgba(0,0,0,0.55); pointer-events: all; }
+    .fb-modal {
+      width: 100%; max-width: 440px;
+      background: #0f1e30; border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 1.2rem 1.2rem 0 0;
+      padding: 1.6rem 1.4rem calc(1.6rem + env(safe-area-inset-bottom));
+      transform: translateY(100%); transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
+    }
+    .fb-overlay.open .fb-modal { transform: translateY(0); }
+    .fb-title {
+      font-size: 1.05rem; font-weight: 700; color: #e2e8f0;
+      margin-bottom: 1rem; text-align: center;
+    }
+    .fb-stars { display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 1rem; }
+    .fb-star {
+      font-size: 1.8rem; cursor: pointer; color: #334155;
+      transition: color 0.12s, transform 0.12s;
+    }
+    .fb-star.lit { color: #fbbf24; }
+    .fb-star:hover { transform: scale(1.15); }
+    .fb-textarea {
+      width: 100%; min-height: 90px; resize: vertical;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 0.6rem; color: #e2e8f0; font-size: 0.9rem;
+      padding: 0.65rem 0.8rem; outline: none; font-family: inherit;
+      margin-bottom: 1rem;
+    }
+    .fb-textarea:focus { border-color: rgba(99,102,241,0.5); }
+    .fb-submit {
+      width: 100%; padding: 0.75rem; border: none; border-radius: 0.7rem;
+      background: linear-gradient(135deg,#6366f1,#8b5cf6);
+      color: #fff; font-size: 0.95rem; font-weight: 600;
+      cursor: pointer; transition: opacity 0.18s;
+    }
+    .fb-submit:disabled { opacity: 0.45; cursor: default; }
+    .fb-status { text-align: center; font-size: 0.85rem; margin-top: 0.7rem; min-height: 1.2rem; }
+
+    /* ---- Add-city card in the grid ---- */
+    .add-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      border: 2px dashed rgba(91,164,245,0.35);
+      border-radius: 18px;
+      min-height: 180px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: transparent;
+      color: #5ba4f5;
+    }
+
+    .add-card:hover {
+      border-color: #5ba4f5;
+      background: rgba(91,164,245,0.06);
+    }
+
+    .add-card-icon {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(91,164,245,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+
+    .add-card-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    /* ---- Bratz Doll sprite ---- */
+    /* Sprite has 3 dolls top row, 2 dolls bottom row.
+       Container 85×125px; background-size 255px crops one doll per slot. */
+    .doll {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 85px;
+      height: 125px;
+      background-image: url('bratzDoll.png');
+      background-repeat: no-repeat;
+      background-size: 255px auto;
+      pointer-events: none;
+      /* Fade left & top edges so doll blends into the card */
+      -webkit-mask-image: linear-gradient(135deg, transparent 8%, black 38%);
+      mask-image: linear-gradient(135deg, transparent 8%, black 38%);
+    }
+
+    /* Top row — each doll is 85px wide at 255px scale */
+    .doll-sunny  { background-position:    0px   0px; }
+    .doll-rainy  { background-position:  -85px   0px; }
+    .doll-snowy  { background-position: -170px   0px; }
+
+    /* Bottom row — 2 dolls; vertical offset ~48% of scaled height */
+    .doll-cloudy { background-position:   -8px -122px; }
+    .doll-hot    { background-position: -135px -122px; }
+
+    /* ── Responsive: tablet (≤ 860px) ────────────────────────────────────── */
+    @media (max-width: 860px) {
+      header { padding: 1.2rem 1.4rem 1rem; }
+
+      .grid {
+        grid-template-columns: repeat(2, 1fr);
+        padding: 1.2rem;
+        gap: 1rem;
+      }
+    }
+
+    /* ── Responsive: mobile (≤ 520px) ────────────────────────────────────── */
+    @media (max-width: 520px) {
+      header {
+        padding: 1rem 1.1rem 0.9rem;
+        padding-top: calc(1rem + env(safe-area-inset-top));
+        padding-left: max(1.1rem, env(safe-area-inset-left));
+        padding-right: max(1.1rem, env(safe-area-inset-right));
+      }
+
+      .logo { font-size: 1.2rem; }
+
+      .grid {
+        grid-template-columns: 1fr;
+        padding: 0.9rem;
+        gap: 0.9rem;
+      }
+
+      /* Cards go slightly wider on single-column mobile */
+      .card { border-radius: 14px; padding: 1.3rem 1.3rem 1rem; }
+
+      /* Modal slides up from bottom as a native-feel sheet */
+      .modal-overlay { align-items: flex-end; }
+
+      .modal {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 20px 20px 0 0;
+        padding: 1.5rem 1.4rem calc(1.5rem + env(safe-area-inset-bottom));
+      }
+
+      .temp-f, .temp-c { font-size: 1.7rem; }
+
+      /* Doll slightly smaller on narrow cards */
+      .doll { width: 72px; height: 108px; background-size: 216px auto; }
+      .doll-sunny  { background-position:    0px   0px; }
+      .doll-rainy  { background-position:  -72px   0px; }
+      .doll-snowy  { background-position: -144px   0px; }
+      .doll-cloudy { background-position:   -7px -104px; }
+      .doll-hot    { background-position: -115px -104px; }
+    }
+
+    /* ── Sponsored Chips (Phase 8) ───────────────────────────────────────── */
+    .sponsored-row { margin: 0.55rem 0 0.65rem; }
+    .sponsored-ad-label {
+      font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.07em;
+      color: #334155; margin-bottom: 0.3rem;
+    }
+    .sponsor-chip {
+      display: inline-flex; align-items: center; gap: 0.32rem;
+      background: rgba(251,191,36,0.07);
+      border: 1px solid rgba(251,191,36,0.18);
+      border-radius: 20px; padding: 0.28rem 0.6rem;
+      font-size: 0.74rem; color: #d4a834;
+      text-decoration: none; cursor: pointer;
+      transition: background 0.18s, border-color 0.18s, color 0.18s;
+    }
+    .sponsor-chip:hover { background: rgba(251,191,36,0.14); border-color: rgba(251,191,36,0.38); color: #fbbf24; }
+    .sponsor-chip-city { background: rgba(139,92,246,0.07); border-color: rgba(139,92,246,0.2); }
+    .sponsor-chip-city:hover { background: rgba(139,92,246,0.14); border-color: rgba(139,92,246,0.4); color: #a78bfa; }
+    .chip-emoji { font-size: 0.88rem; }
+    .chip-price { color: #64748b; font-size: 0.67rem; }
+    .chip-arr   { color: #475569; font-size: 0.68rem; }
+
+    /* ── Clickable card cursor (Phase 7) ──────────────────────────────────── */
+    .card:not(.loading):not(.error-card) { cursor: pointer; }
+
+    /* ── Detail Panel (Phase 7) ───────────────────────────────────────────── */
+    .detail-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      pointer-events: none; overflow: hidden;
+    }
+    .detail-overlay.open { pointer-events: all; }
+
+    .detail-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.45);
+      opacity: 0; transition: opacity 0.35s;
+    }
+    .detail-overlay.open .detail-backdrop { opacity: 1; }
+
+    .detail-panel {
+      position: absolute; top: 0; right: 0; bottom: 0;
+      width: min(520px, 100vw);
+      background: linear-gradient(180deg, #0f2137 0%, #121e2e 100%);
+      border-left: 1px solid rgba(255,255,255,0.08);
+      transform: translateX(110%);
+      transition: transform 0.38s cubic-bezier(0.4,0,0.2,1);
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: -20px 0 60px rgba(0,0,0,0.5);
+    }
+    .detail-overlay.open .detail-panel { transform: translateX(0); }
+
+    .detail-header {
+      display: flex; align-items: center; gap: 0.8rem;
+      padding: 1.2rem 1.5rem;
+      padding-top: max(1.2rem, env(safe-area-inset-top));
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      flex-shrink: 0;
+    }
+    .detail-back {
+      background: rgba(255,255,255,0.07); border: none; color: #94a3b8;
+      width: 36px; height: 36px; border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background 0.2s, color 0.2s;
+    }
+    .detail-back:hover { background: rgba(255,255,255,0.13); color: #f1f5f9; }
+    .detail-city-name    { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; }
+    .detail-city-country { font-size: 0.78rem; color: #64748b; }
+
+    .detail-body {
+      flex: 1; overflow-y: auto;
+      padding: 1.2rem 1.5rem;
+      padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    }
+    .detail-current { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.4rem; }
+    .detail-big-icon  { font-size: 3.5rem; line-height: 1; }
+    .detail-main-temp { font-size: 2.4rem; font-weight: 700; color: #f1f5f9; }
+    .detail-alt-temp  { font-size: 1.1rem; font-weight: 300; color: #64748b; margin-left: 0.3rem; }
+    .detail-cond-text { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.07em; color: #94a3b8; margin-top: 0.15rem; }
+
+    .detail-section-label {
+      font-size: 0.63rem; text-transform: uppercase; letter-spacing: 0.09em;
+      color: #334155; margin: 1.3rem 0 0.55rem;
+    }
+
+    /* Hourly strip */
+    .hourly-strip {
+      display: flex; gap: 0.55rem; overflow-x: auto;
+      padding-bottom: 0.4rem; scrollbar-width: none;
+    }
+    .hourly-strip::-webkit-scrollbar { display: none; }
+    .hourly-item {
+      flex-shrink: 0; display: flex; flex-direction: column; align-items: center;
+      gap: 0.18rem; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07); border-radius: 10px;
+      padding: 0.5rem 0.55rem; min-width: 52px;
+    }
+    .h-time { font-size: 0.65rem; color: #64748b; }
+    .h-icon { font-size: 1.2rem; }
+    .h-temp { font-size: 0.8rem; font-weight: 600; color: #e2e8f0; }
+    .h-pop  { font-size: 0.63rem; color: #60a5fa; }
+
+    /* Daily rows */
+    .daily-row {
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: 0.55rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .d-day  { width: 38px; font-size: 0.78rem; font-weight: 600; color: #94a3b8; flex-shrink: 0; }
+    .d-icon { font-size: 1.25rem; flex-shrink: 0; }
+    .d-desc { font-size: 0.74rem; color: #64748b; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .d-temps { font-size: 0.8rem; font-weight: 600; color: #e2e8f0; white-space: nowrap; }
+    .d-temps .lo { color: #64748b; font-weight: 400; }
+    .d-pop  { font-size: 0.7rem; color: #60a5fa; width: 32px; text-align: right; flex-shrink: 0; }
+
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-top: 0.5rem; }
+    .stat-tile {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px; padding: 0.65rem 0.85rem;
+    }
+    .st-label { font-size: 0.61rem; text-transform: uppercase; letter-spacing: 0.06em; color: #475569; margin-bottom: 0.22rem; }
+    .st-value { font-size: 0.92rem; font-weight: 600; color: #e2e8f0; }
+    .st-sub   { font-size: 0.66rem; color: #64748b; margin-top: 0.08rem; }
+
+    /* Large doll in detail */
+    .detail-doll-wrap {
+      position: relative; height: 175px; margin-top: 1.4rem;
+      border-radius: 12px; background: rgba(255,255,255,0.02); overflow: hidden;
+    }
+    @keyframes doll-rise {
+      from { transform: translateY(22px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .detail-doll-wrap .doll {
+      position: absolute; bottom: 0; right: 1rem;
+      width: 120px; height: 175px; background-size: 360px auto;
+      animation: doll-rise 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.15s both;
+    }
+    .detail-doll-wrap .doll-sunny  { background-position:    0px   0px; }
+    .detail-doll-wrap .doll-rainy  { background-position: -120px   0px; }
+    .detail-doll-wrap .doll-snowy  { background-position: -240px   0px; }
+    .detail-doll-wrap .doll-cloudy { background-position:  -12px -172px; }
+    .detail-doll-wrap .doll-hot    { background-position: -192px -172px; }
+
+    .band-chart { width: 100%; display: block; overflow: visible; margin: 0.3rem 0 0.2rem; }
+    .detail-loading { display: flex; align-items: center; justify-content: center; height: 200px; color: #475569; font-size: 0.9rem; }
+
+    @media (max-width: 520px) {
+      .detail-panel {
+        top: auto; left: 0; right: 0; bottom: 0;
+        width: 100%; height: 88vh; border-left: none;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        border-radius: 20px 20px 0 0;
+        transform: translateY(110%);
+        box-shadow: 0 -20px 60px rgba(0,0,0,0.5);
+      }
+      .detail-overlay.open .detail-panel { transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+         style="display:inline-block;vertical-align:middle;margin-right:0.45rem;flex-shrink:0">
+      <!-- Canopy -->
+      <path d="M2 12C2 6.477 6.477 2 12 2s10 4.477 10 10H2Z" fill="#fbbf24"/>
+      <!-- Shaft -->
+      <line x1="12" y1="12" x2="12" y2="20" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+      <!-- Hook -->
+      <path d="M12 20C12 22 10 23 9 22" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" fill="none"/>
+    </svg>
+    Sunny<span>Babe</span>
+  </div>
+  <button class="add-btn" onclick="openModal()">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Add City
+  </button>
+</header>
+
+<div class="grid" id="cityGrid"></div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Add a City</h2>
+    <div class="input-wrapper">
+      <input type="text" id="cityInput" placeholder="Type a city name..." autocomplete="off" />
+      <div class="suggestion-list" id="suggestionList" style="display:none;"></div>
+    </div>
+    <div class="modal-hint">Search any city worldwide — powered by OpenWeatherMap</div>
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-add" id="addBtn" onclick="confirmAdd()" disabled>Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Panel Overlay (Phase 7) -->
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-backdrop" onclick="closeDetail()"></div>
+  <div class="detail-panel">
+    <div class="detail-header">
+      <button class="detail-back" onclick="closeDetail()" title="Back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <div>
+        <div class="detail-city-name" id="detailCityName"></div>
+        <div class="detail-city-country" id="detailCityCountry"></div>
+      </div>
+    </div>
+    <div class="detail-body" id="detailBody">
+      <div class="detail-loading">Loading forecast…</div>
+    </div>
+  </div>
+</div>
+
+<footer>Live data &amp; forecasts via OpenWeatherMap &mdash; Phase 8</footer>
+
+<!-- Feedback FAB -->
+<button class="feedback-fab" onclick="openFeedback()" title="Send feedback">💬</button>
+
+<!-- Feedback modal -->
+<div class="fb-overlay" id="fbOverlay" onclick="closeFeedbackIfBackdrop(event)">
+  <div class="fb-modal" id="fbModal">
+    <div class="fb-title">Share Your Feedback</div>
+    <div class="fb-stars" id="fbStars">
+      <span class="fb-star" data-v="1" onclick="setRating(1)">★</span>
+      <span class="fb-star" data-v="2" onclick="setRating(2)">★</span>
+      <span class="fb-star" data-v="3" onclick="setRating(3)">★</span>
+      <span class="fb-star" data-v="4" onclick="setRating(4)">★</span>
+      <span class="fb-star" data-v="5" onclick="setRating(5)">★</span>
+    </div>
+    <textarea class="fb-textarea" id="fbMessage" placeholder="What's on your mind? Bugs, ideas, love notes…"></textarea>
+    <button class="fb-submit" id="fbSubmit" onclick="submitFeedback()">Send Feedback</button>
+    <div class="fb-status" id="fbStatus"></div>
+  </div>
+</div>
+
+<script>
+  const API_KEY = '6d83f84f4ec74e0194482ddfa6173b45';
+
+  let cities  = [];
+  let nextId  = 1;
+  let selectedLocation = null;
+  let debounceTimer    = null;
+
+  const DEFAULTS = [
+    { cityName: 'Mombasa',   countryCode: 'KE', lat: -4.0435,  lon:  39.6682 },
+    { cityName: 'Milwaukee', countryCode: 'US', lat:  43.0389,  lon: -87.9065 },
+    { cityName: 'New York',  countryCode: 'US', lat:  40.7128,  lon: -74.0060 },
+  ];
+
+  // ── Doll sprite selection ─────────────────────────────────────────────────
+
+  function dollClass(type, tempF) {
+    // Priority order per plan (Phase 4):
+    // 1. Rainy condition         → rainy doll
+    // 2. Snowy condition OR <50F → snowy doll
+    // 3. 70F or more             → extra hot doll
+    // 4. 50–69F                  → sunny doll
+    // 5. Everything else (cloudy, stormy…) → cloudy doll
+    if (type === 'rainy')               return 'rainy';
+    if (type === 'snowy' || tempF < 50) return 'snowy';
+    if (tempF >= 70)                    return 'hot';
+    if (tempF >= 50 && tempF <= 69)     return 'sunny';
+    return 'cloudy';
+  }
+
+  // ── Condition helpers ──────────────────────────────────────────────────────
+
+  function conditionMeta(id) {
+    if (id >= 200 && id < 300) return { icon: '⛈️',  type: 'stormy' };
+    if (id >= 300 && id < 400) return { icon: '🌦️',  type: 'rainy'  };
+    if (id >= 500 && id < 600) return { icon: '🌧️',  type: 'rainy'  };
+    if (id >= 600 && id < 700) return { icon: '🌨️',  type: 'snowy'  };
+    if (id >= 700 && id < 800) return { icon: '🌫️',  type: 'cloudy' };
+    if (id === 800)             return { icon: '☀️',   type: 'sunny'  };
+    if (id === 801)             return { icon: '🌤️',  type: 'cloudy' };
+    if (id === 802)             return { icon: '⛅',   type: 'cloudy' };
+    return                             { icon: '☁️',   type: 'cloudy' };
+  }
+
+  // ── Parse current weather ─────────────────────────────────────────────────
+
+  function parseWeather(raw) {
+    const tempC   = Math.round(raw.main.temp);
+    const tempF   = Math.round(tempC * 9 / 5 + 32);
+    const feelsC  = Math.round(raw.main.feels_like);
+    const feelsF  = Math.round(feelsC * 9 / 5 + 32);
+    const windMph = Math.round((raw.wind?.speed ?? 0) * 2.237);
+    const condText = raw.weather[0].description
+      .split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+    const { icon, type } = conditionMeta(raw.weather[0].id);
+    return { tempC, tempF, feelsC, feelsF, windMph,
+             humidity: raw.main.humidity, condition: condText, icon, type,
+             cityName: raw.name, countryCode: raw.sys.country };
+  }
+
+  // ── Parse 5-day forecast ──────────────────────────────────────────────────
+
+  function parseForecast(raw) {
+    // Group 3-hour slots by calendar day
+    const dayMap = new Map();
+    raw.list.forEach(item => {
+      const d   = new Date(item.dt * 1000);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const label = d.toLocaleDateString('en-US', { weekday: 'short' });
+      if (!dayMap.has(key)) dayMap.set(key, { label, temps: [], condIds: [] });
+      const entry = dayMap.get(key);
+      entry.temps.push(item.main.temp);
+      entry.condIds.push(item.weather[0].id);
+    });
+
+    return Array.from(dayMap.values()).slice(0, 5).map((d, i) => {
+      const tempC  = Math.round(Math.max(...d.temps));
+      const tempF  = Math.round(tempC * 9 / 5 + 32);
+      // Most common condition
+      const freq   = {};
+      d.condIds.forEach(id => { freq[id] = (freq[id] ?? 0) + 1; });
+      const condId = parseInt(Object.entries(freq).sort((a,b) => b[1]-a[1])[0][0]);
+      return { day: i === 0 ? 'Today' : d.label, tempC, tempF, condId };
+    });
+  }
+
+  // ── Parse hourly (next 24 h, 3-hour slots from /forecast) ────────────────
+
+  function parseHourly(raw) {
+    return (raw.list || []).slice(0, 8).map(item => {
+      const tempF = Math.round(item.main.temp * 9 / 5 + 32);
+      const { icon } = conditionMeta(item.weather[0].id);
+      const pop  = Math.round((item.pop || 0) * 100);
+      const time = new Date(item.dt * 1000).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+      return { time, tempF, icon, pop };
+    });
+  }
+
+  // ── Alert quip ────────────────────────────────────────────────────────────
+
+  function generateQuip(forecast, currentWeather) {
+    const currentType = currentWeather.type;
+    const currentTempF = currentWeather.tempF;
+    const future = forecast.slice(1);
+
+    // Precipitation checks
+    const hasStorm = future.some(d => d.condId >= 200 && d.condId < 300);
+    const hasSnow  = future.some(d => d.condId >= 600 && d.condId < 700);
+    const hasRain  = future.some(d => d.condId >= 300 && d.condId < 600);
+    const allSunny = future.every(d => d.condId === 800 || d.condId === 801);
+    const allClear = future.every(d => d.condId >= 800);
+
+    // Temperature trend checks (°F, across all forecast days including today)
+    const isChilly   = currentTempF < 60;
+    const rises      = forecast.some((d, i) => i > 0 && d.tempF - forecast[i - 1].tempF > 5);
+    const drops      = forecast.some((d, i) => i > 0 && forecast[i - 1].tempF - d.tempF > 5);
+    const isWarming  = rises;
+    const isVariable = rises && drops;
+
+    // Priority order
+    if (hasStorm) return { text: '⚠️ Storm incoming — stay safe!',                        sentiment: 'warn'    };
+    if (hasSnow && currentType !== 'snowy') return { text: '❄️ Uh oh, snow is on the way — bundle up!',  sentiment: 'warn' };
+    if (hasSnow)  return { text: '🌨️ Uh oh, more snow is coming — stay warm!',            sentiment: 'warn'    };
+    if (hasRain && currentType === 'sunny') return { text: '🌧️ Rain\'s coming — enjoy the sun while it lasts!', sentiment: 'neutral' };
+    if (hasRain)  return { text: '☔ Uh oh, more wet days ahead — grab your umbrella!',   sentiment: 'neutral' };
+
+    if (isVariable) return { text: '🌡️ Heads up — temperatures are all over the place this week!', sentiment: 'neutral' };
+    if (isChilly && isWarming) return { text: '🧥 Still a bit chilly, but warming up!',  sentiment: 'neutral' };
+    if (isChilly)   return { text: '🧤 Still a bit chilly out there — layer up!',         sentiment: 'neutral' };
+    if (isWarming)  return { text: '🌡️ Good news — warming up a bit over the coming days!', sentiment: 'good'  };
+
+    if (allSunny) return { text: '☀️ Clear skies all week — enjoy it!',                   sentiment: 'good'    };
+    if (allClear) return { text: '🌤️ Things are clearing up nicely!',                     sentiment: 'good'    };
+    return               { text: '🌤️ Mixed conditions expected this week.',               sentiment: 'neutral' };
+  }
+
+  // ── Mini forecast SVG chart ───────────────────────────────────────────────
+
+  function renderMiniChart(forecast) {
+    if (!forecast || forecast.length < 2) return '';
+
+    const W = 260, H = 82;
+    const padL = 6, padR = 6, padT = 18, padB = 20;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+
+    const temps = forecast.map(d => d.tempF);
+    const minT  = Math.min(...temps);
+    const maxT  = Math.max(...temps);
+    const range = Math.max(maxT - minT, 8);
+
+    const n  = forecast.length;
+    const xs = forecast.map((_, i) => padL + (i / (n - 1)) * plotW);
+    const ys = temps.map(t => padT + plotH - ((t - minT) / range) * plotH);
+
+    const linePts = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+    const areaPts = `${xs[0]},${H - padB} ${linePts} ${xs[n-1]},${H - padB}`;
+
+    // Chart color keyed to first day's condition
+    const id0 = forecast[0].condId;
+    let lc, fc;
+    if      (id0 >= 600 && id0 < 700) { lc = '#bfdbfe'; fc = 'rgba(191,219,254,0.12)'; }
+    else if (id0 >= 200 && id0 < 600) { lc = '#60a5fa'; fc = 'rgba(96,165,250,0.12)';  }
+    else if (id0 === 800 || id0 === 801) { lc = '#fbbf24'; fc = 'rgba(251,191,36,0.12)'; }
+    else                               { lc = '#94a3b8'; fc = 'rgba(148,163,184,0.12)'; }
+
+    let s = `<svg class="forecast-chart" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+    // Area fill
+    s += `<polygon points="${areaPts}" fill="${fc}"/>`;
+
+    // Line
+    s += `<polyline points="${linePts}" fill="none" stroke="${lc}" stroke-width="1.8"
+            stroke-linejoin="round" stroke-linecap="round"/>`;
+
+    // Dots + labels
+    forecast.forEach((d, i) => {
+      const x = xs[i].toFixed(1);
+      const y = ys[i].toFixed(1);
+      // temp above
+      s += `<text x="${x}" y="${(ys[i] - 6).toFixed(1)}" text-anchor="middle"
+              font-size="9" fill="${lc}" font-family="system-ui,sans-serif">${d.tempF}°</text>`;
+      // dot
+      s += `<circle cx="${x}" cy="${y}" r="3" fill="${lc}" stroke="#1a2840" stroke-width="1.5"/>`;
+      // day below
+      s += `<text x="${x}" y="${H - 4}" text-anchor="middle"
+              font-size="9" fill="#475569" font-family="system-ui,sans-serif">${d.day}</text>`;
+    });
+
+    s += `</svg>`;
+    return s;
+  }
+
+  // ── API calls ─────────────────────────────────────────────────────────────
+
+  async function fetchWeather(lat, lon) {
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
+    );
+    if (!res.ok) throw new Error(`weather ${res.status}`);
+    return res.json();
+  }
+
+  async function fetchForecast(lat, lon) {
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`
+    );
+    if (!res.ok) throw new Error(`forecast ${res.status}`);
+    return res.json();
+  }
+
+  async function geocodeSearch(query) {
+    const res = await fetch(
+      `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=5&appid=${API_KEY}`
+    );
+    if (!res.ok) throw new Error(`geo ${res.status}`);
+    return res.json();
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────────────
+
+  function renderCards() {
+    const grid = document.getElementById('cityGrid');
+    grid.innerHTML = '';
+
+    cities.forEach(city => {
+      const card = document.createElement('div');
+
+      if (city.loading) {
+        card.className = 'card loading';
+        card.innerHTML = `
+          <div class="card-top">
+            <div>
+              <div class="city-name">${city.cityName}</div>
+              <div class="city-country">${city.countryCode}</div>
+            </div>
+            <button class="delete-btn" onclick="deleteCity(${city.id})">✕</button>
+          </div>
+          <div class="skeleton sk-icon"></div>
+          <div class="skeleton sk-cond" style="margin-bottom:.75rem"></div>
+          <div class="skeleton sk-temp"></div>
+          <div class="skeleton sk-bar"></div>
+          <div class="skeleton sk-bar2"></div>`;
+
+      } else if (city.error) {
+        card.className = 'card error-card';
+        card.innerHTML = `
+          <div class="card-top">
+            <div>
+              <div class="city-name">${city.cityName}</div>
+              <div class="city-country">${city.countryCode}</div>
+            </div>
+            <button class="delete-btn" onclick="deleteCity(${city.id})">✕</button>
+          </div>
+          <div class="error-body">⚠️ Could not load weather data</div>`;
+
+      } else {
+        const w = city.data;
+        const q = city.quip;
+        const chartHtml = renderMiniChart(city.forecast);
+        const cardSponsored = buildSponsorChips(w.type, w.tempF, 1, true, city.cityName, city.countryCode);
+        card.className = `card ${w.type}`;
+        card.onclick = () => openDetail(city.id);
+        card.innerHTML = `
+          <div class="card-glow"></div>
+          <div class="card-top">
+            <div>
+              <div class="city-name">${w.cityName}</div>
+              <div class="city-country">${w.countryCode}</div>
+            </div>
+            <button class="delete-btn" onclick="event.stopPropagation();deleteCity(${city.id})" title="Remove city">✕</button>
+          </div>
+          ${q ? `<div class="quip ${q.sentiment}">${q.text}</div>` : ''}
+          <div class="weather-icon">${w.icon}</div>
+          <div class="condition">${w.condition}</div>
+          <div class="temps">
+            <span class="temp-f">${w.tempF}°F</span>
+            <span class="temp-divider">|</span>
+            <span class="temp-c">${w.tempC}°C</span>
+          </div>
+          <div class="temp-labels">
+            <span>Fahrenheit</span>
+            <span style="margin-left:0.7rem">Celsius</span>
+          </div>
+          <div class="details">
+            <div class="detail-item">
+              <span class="detail-label">Feels Like</span>
+              <span class="detail-value">${w.feelsF}°F / ${w.feelsC}°C</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Humidity</span>
+              <span class="detail-value">${w.humidity}%</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Wind</span>
+              <span class="detail-value">${w.windMph} mph</span>
+            </div>
+          </div>
+          ${chartHtml ? `<div class="forecast-section">
+            <div class="forecast-label">5-Day Forecast &mdash; °F High</div>
+            ${chartHtml}
+          </div>` : ''}
+          ${cardSponsored}
+          <div class="doll doll-${dollClass(w.type, w.tempF)}"></div>`;
+      }
+
+      grid.appendChild(card);
+    });
+
+    // Always append the "+ Add City" card at the end of the grid
+    const addCard = document.createElement('div');
+    addCard.className = 'add-card';
+    addCard.onclick = openModal;
+    addCard.innerHTML = `
+      <div class="add-card-icon">+</div>
+      <div class="add-card-label">Add City</div>`;
+    grid.appendChild(addCard);
+  }
+
+  // ── City management ───────────────────────────────────────────────────────
+
+  function deleteCity(id) {
+    const city = cities.find(c => c.id === id);
+    if (city) track('city_delete', { city_name: city.cityName, country_code: city.countryCode });
+    cities = cities.filter(c => c.id !== id);
+    renderCards();
+  }
+
+  async function loadCity(lat, lon, cityName, countryCode) {
+    const id    = nextId++;
+    const entry = { id, cityName, countryCode, lat, lon,
+                    data: null, forecast: null, quip: null,
+                    loading: true, error: false };
+    cities.push(entry);
+    renderCards();
+
+    try {
+      const [weatherRaw, forecastRaw] = await Promise.all([
+        fetchWeather(lat, lon),
+        fetchForecast(lat, lon),
+      ]);
+      entry.data     = parseWeather(weatherRaw);
+      entry.forecast = parseForecast(forecastRaw);
+      entry.hourly   = parseHourly(forecastRaw);
+      entry.quip     = generateQuip(entry.forecast, entry.data);
+      entry.loading  = false;
+      track('city_add', {
+        city_name:     cityName,
+        country_code:  countryCode,
+        weather_bucket: getWeatherBucket(entry.data.type, entry.data.tempF),
+        temp_f:        entry.data.tempF,
+        condition:     entry.data.type,
+      });
+    } catch {
+      entry.loading = false;
+      entry.error   = true;
+    }
+    renderCards();
+  }
+
+  // ── Modal / Autocomplete ──────────────────────────────────────────────────
+
+  function openModal() {
+    selectedLocation = null;
+    document.getElementById('cityInput').value        = '';
+    document.getElementById('errorMsg').textContent   = '';
+    document.getElementById('addBtn').disabled        = true;
+    hideSuggestions();
+    document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('cityInput').focus(), 60);
+  }
+
+  function closeModal() {
+    hideSuggestions();
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+
+  function hideSuggestions() {
+    const list = document.getElementById('suggestionList');
+    list.style.display = 'none';
+    list.innerHTML     = '';
+    document.getElementById('cityInput').classList.remove('has-suggestions');
+  }
+
+  function showSuggestions(items) {
+    const list = document.getElementById('suggestionList');
+    list.innerHTML = '';
+    if (!items.length) {
+      list.innerHTML = '<div class="suggestion-item no-result">No results found</div>';
+    } else {
+      items.forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'suggestion-item';
+        item.innerHTML = `<span>${r.name}${r.state ? ', ' + r.state : ''}</span>
+                          <span class="suggestion-flag">${r.country}</span>`;
+        item.addEventListener('mousedown', e => {
+          e.preventDefault();
+          selectedLocation = r;
+          document.getElementById('cityInput').value      = `${r.name}${r.state ? ', ' + r.state : ''}, ${r.country}`;
+          document.getElementById('errorMsg').textContent = '';
+          document.getElementById('addBtn').disabled      = false;
+          hideSuggestions();
+        });
+        list.appendChild(item);
+      });
+    }
+    list.style.display = 'block';
+    document.getElementById('cityInput').classList.add('has-suggestions');
+  }
+
+  document.getElementById('cityInput').addEventListener('input', e => {
+    selectedLocation = null;
+    document.getElementById('addBtn').disabled = true;
+    clearTimeout(debounceTimer);
+    const query = e.target.value.trim();
+    if (query.length < 2) { hideSuggestions(); return; }
+
+    const list = document.getElementById('suggestionList');
+    list.innerHTML    = '<div class="suggestion-item searching">Searching...</div>';
+    list.style.display = 'block';
+    document.getElementById('cityInput').classList.add('has-suggestions');
+
+    debounceTimer = setTimeout(async () => {
+      try {
+        const results = await geocodeSearch(query);
+        showSuggestions(results);
+      } catch {
+        hideSuggestions();
+        document.getElementById('errorMsg').textContent = 'Search failed — check your connection.';
+      }
+    }, 350);
+  });
+
+  document.getElementById('cityInput').addEventListener('blur',   () => setTimeout(hideSuggestions, 150));
+  document.getElementById('cityInput').addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+  document.getElementById('modalOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+  });
+
+  async function confirmAdd() {
+    const errorEl = document.getElementById('errorMsg');
+    if (!selectedLocation) { errorEl.textContent = 'Please select a city from the list.'; return; }
+    const dup = cities.find(c =>
+      Math.abs(c.lat - selectedLocation.lat) < 0.05 &&
+      Math.abs(c.lon - selectedLocation.lon) < 0.05
+    );
+    if (dup) { errorEl.textContent = 'That city is already on your board.'; return; }
+    const { lat, lon, name, country } = selectedLocation;
+    closeModal();
+    await loadCity(lat, lon, name, country);
+  }
+
+  // ── Sponsored Chips (Phase 8) ─────────────────────────────────────────────
+
+  function buildSponsorChips(type, tempF, count, stopProp, cityName, countryCode) {
+    if (typeof getSponsoredLinks !== 'function') return '';
+    const links    = getSponsoredLinks(type, tempF, count);
+    const cityLink = (typeof getCityLink === 'function') ? getCityLink(cityName, countryCode) : null;
+    if (!links.length && !cityLink) return '';
+    const bucket = (typeof getWeatherBucket === 'function') ? getWeatherBucket(type, tempF) : type;
+    const sp = stopProp ? 'event.stopPropagation();' : '';
+    const chipHtml = p =>
+      `<a class="sponsor-chip" href="${p.url}" target="_blank" rel="noopener"
+          data-track-event="sponsor_click" data-track-type="weather"
+          data-track-label="${p.label.replace(/"/g,'&quot;')}" data-track-bucket="${bucket}"
+          data-track-city="${(cityName||'').replace(/"/g,'&quot;')}"
+          onclick="${sp}">
+        <span class="chip-emoji">${p.emoji}</span>
+        <span>${p.label}</span>
+        <span class="chip-price">${p.price}</span>
+        <span class="chip-arr">›</span>
+      </a>`;
+    const weatherChips = links.map(chipHtml).join('');
+    const cityChip = cityLink
+      ? `<a class="sponsor-chip sponsor-chip-city" href="${cityLink.url}" target="_blank" rel="noopener"
+            data-track-event="sponsor_click" data-track-type="city"
+            data-track-label="${cityLink.label.replace(/"/g,'&quot;')}" data-track-bucket="${bucket}"
+            data-track-city="${(cityName||'').replace(/"/g,'&quot;')}"
+            onclick="${sp}">
+          <span class="chip-emoji">${cityLink.emoji}</span>
+          <span>${cityLink.label}</span>
+          <span class="chip-price">${cityLink.price}</span>
+          <span class="chip-arr">›</span>
+        </a>`
+      : '';
+    return `<div class="sponsored-row"><div class="sponsored-ad-label">Ad</div>${weatherChips}${cityChip}</div>`;
+  }
+
+  // ── Detail Panel (Phase 7) ────────────────────────────────────────────────
+
+  async function fetchOneCall(lat, lon) {
+    const res = await fetch(
+      `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&exclude=minutely,alerts`
+    );
+    if (!res.ok) throw new Error(`onecall ${res.status}`);
+    return res.json();
+  }
+
+  function fmtTime(dt) {
+    return new Date(dt * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+
+  function uvLabel(uv) {
+    if (uv <= 2)  return { label: 'Low',       color: '#4ade80' };
+    if (uv <= 5)  return { label: 'Moderate',  color: '#facc15' };
+    if (uv <= 7)  return { label: 'High',       color: '#f97316' };
+    if (uv <= 10) return { label: 'Very High',  color: '#ef4444' };
+    return               { label: 'Extreme',    color: '#a855f7' };
+  }
+
+  function moonPhaseInfo(phase) {
+    if (phase === 0 || phase === 1) return { icon: '🌑', label: 'New Moon' };
+    if (phase < 0.25)  return { icon: '🌒', label: 'Waxing Crescent' };
+    if (phase === 0.25) return { icon: '🌓', label: 'First Quarter' };
+    if (phase < 0.5)   return { icon: '🌔', label: 'Waxing Gibbous' };
+    if (phase === 0.5)  return { icon: '🌕', label: 'Full Moon' };
+    if (phase < 0.75)  return { icon: '🌖', label: 'Waning Gibbous' };
+    if (phase === 0.75) return { icon: '🌗', label: 'Last Quarter' };
+    return                     { icon: '🌘', label: 'Waning Crescent' };
+  }
+
+  function renderBandChart(days) {
+    if (!days || days.length < 2) return '';
+    const W = 460, H = 90, padL = 6, padR = 6, padT = 18, padB = 18;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const highs = days.map(d => d.hiF), lows = days.map(d => d.loF);
+    const allT  = [...highs, ...lows];
+    const minT  = Math.min(...allT), maxT = Math.max(...allT);
+    const range = Math.max(maxT - minT, 8);
+    const n = days.length;
+    const xs  = days.map((_, i) => padL + (i / (n - 1)) * plotW);
+    const yHi = highs.map(t => padT + plotH - ((t - minT) / range) * plotH);
+    const yLo = lows.map(t  => padT + plotH - ((t - minT) / range) * plotH);
+    const areaPts = [
+      ...xs.map((x, i) => `${x.toFixed(1)},${yHi[i].toFixed(1)}`),
+      ...[...xs].reverse().map((x, i) => `${x.toFixed(1)},${yLo[n - 1 - i].toFixed(1)}`)
+    ].join(' ');
+    const hiPts = xs.map((x, i) => `${x.toFixed(1)},${yHi[i].toFixed(1)}`).join(' ');
+    const loPts = xs.map((x, i) => `${x.toFixed(1)},${yLo[i].toFixed(1)}`).join(' ');
+    let s = `<svg class="band-chart" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+    s += `<polygon points="${areaPts}" fill="rgba(251,191,36,0.07)"/>`;
+    s += `<polyline points="${hiPts}" fill="none" stroke="#fbbf24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+    s += `<polyline points="${loPts}" fill="none" stroke="#60a5fa" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3,2"/>`;
+    days.forEach((d, i) => {
+      const x = xs[i].toFixed(1);
+      s += `<text x="${x}" y="${(yHi[i] - 5).toFixed(1)}" text-anchor="middle" font-size="8" fill="#fbbf24" font-family="system-ui,sans-serif">${d.hiF}°</text>`;
+      s += `<text x="${x}" y="${H - 3}" text-anchor="middle" font-size="8" fill="#475569" font-family="system-ui,sans-serif">${d.day}</text>`;
+    });
+    s += `</svg>`;
+    return s;
+  }
+
+  function buildDetailHTML(city, oneCall) {
+    const w = city.data;
+    const cur = oneCall.current;
+    const hourly = (oneCall.hourly || []).slice(0, 24);
+    const rawDaily = (oneCall.daily  || []).slice(0, 8);
+
+    // Parse daily
+    const days = rawDaily.map((d, i) => {
+      const date = new Date(d.dt * 1000);
+      const day  = i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
+      const hiC  = Math.round(d.temp.max), loC = Math.round(d.temp.min);
+      const hiF  = Math.round(hiC * 9 / 5 + 32), loF = Math.round(loC * 9 / 5 + 32);
+      const { icon } = conditionMeta(d.weather[0].id);
+      const desc = d.weather[0].description.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+      const pop  = Math.round((d.pop || 0) * 100);
+      return { day, hiF, loF, hiC, loC, icon, desc, pop };
+    });
+
+    // Hourly HTML
+    let hourlyHtml = '';
+    hourly.forEach(h => {
+      const time = new Date(h.dt * 1000).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+      const tF   = Math.round(h.temp * 9 / 5 + 32);
+      const { icon } = conditionMeta(h.weather[0].id);
+      const pop  = Math.round((h.pop || 0) * 100);
+      hourlyHtml += `<div class="hourly-item">
+        <div class="h-time">${time}</div>
+        <div class="h-icon">${icon}</div>
+        <div class="h-temp">${tF}°F</div>
+        <div class="h-pop">${pop > 10 ? pop + '%' : ''}</div>
+      </div>`;
+    });
+
+    // Daily rows HTML
+    let dailyHtml = '';
+    days.forEach(d => {
+      dailyHtml += `<div class="daily-row">
+        <div class="d-day">${d.day}</div>
+        <div class="d-icon">${d.icon}</div>
+        <div class="d-desc">${d.desc}</div>
+        <div class="d-temps">${d.hiF}° <span class="lo">/ ${d.loF}°F</span></div>
+        <div class="d-pop">${d.pop > 20 ? '💧' + d.pop + '%' : ''}</div>
+      </div>`;
+    });
+
+    // Stats
+    const uvi   = Math.round(cur.uvi ?? 0);
+    const uvInf  = uvLabel(uvi);
+    const moon   = moonPhaseInfo(rawDaily[0]?.moon_phase ?? 0);
+    const sunrise = fmtTime(cur.sunrise ?? rawDaily[0]?.sunrise);
+    const sunset  = fmtTime(cur.sunset  ?? rawDaily[0]?.sunset);
+    const visMi   = ((cur.visibility ?? 0) / 1609).toFixed(1);
+    const dewC    = Math.round(cur.dew_point ?? 0);
+    const dewF    = Math.round(dewC * 9 / 5 + 32);
+    const dc      = dollClass(w.type, w.tempF);
+
+    return `
+      <div class="detail-current">
+        <div class="detail-big-icon">${w.icon}</div>
+        <div>
+          <div><span class="detail-main-temp">${w.tempF}°F</span><span class="detail-alt-temp">${w.tempC}°C</span></div>
+          <div class="detail-cond-text">${w.condition}</div>
+        </div>
+      </div>
+
+      <div class="detail-section-label">Hourly — Next 24 Hours</div>
+      <div class="hourly-strip">${hourlyHtml}</div>
+
+      <div class="detail-section-label">8-Day Forecast</div>
+      ${renderBandChart(days)}
+      ${dailyHtml}
+
+      <div class="detail-section-label">Conditions</div>
+      <div class="stats-grid">
+        <div class="stat-tile"><div class="st-label">Sunrise</div><div class="st-value">🌅 ${sunrise}</div></div>
+        <div class="stat-tile"><div class="st-label">Sunset</div><div class="st-value">🌇 ${sunset}</div></div>
+        <div class="stat-tile"><div class="st-label">UV Index</div><div class="st-value" style="color:${uvInf.color}">${uvi} — ${uvInf.label}</div></div>
+        <div class="stat-tile"><div class="st-label">Visibility</div><div class="st-value">${visMi} mi</div></div>
+        <div class="stat-tile"><div class="st-label">Dew Point</div><div class="st-value">${dewF}°F / ${dewC}°C</div></div>
+        <div class="stat-tile"><div class="st-label">Moon Phase</div><div class="st-value">${moon.icon} ${moon.label}</div></div>
+      </div>
+
+      <div class="detail-section-label">Shop for Today's Weather</div>
+      ${buildSponsorChips(w.type, w.tempF, 3, false, city.cityName, city.countryCode)}
+
+      <div class="detail-doll-wrap">
+        <div class="doll doll-${dc}"></div>
+      </div>`;
+  }
+
+  function buildDetailFallback(city) {
+    const w = city.data;
+    const fc = city.forecast || [];
+    const hr = city.hourly   || [];
+
+    const hourlyHtml = hr.length ? `
+      <div class="detail-section-label">Hourly — Next 24 Hours</div>
+      <div class="hourly-strip">
+        ${hr.map(h => `<div class="hourly-item">
+          <div class="h-time">${h.time}</div>
+          <div class="h-icon">${h.icon}</div>
+          <div class="h-temp">${h.tempF}°F</div>
+          <div class="h-pop">${h.pop > 10 ? h.pop + '%' : ''}</div>
+        </div>`).join('')}
+      </div>` : '';
+
+    let dailyHtml = '';
+    fc.forEach(d => {
+      const { icon } = conditionMeta(d.condId);
+      const desc = conditionMeta(d.condId).type;
+      dailyHtml += `<div class="daily-row">
+        <div class="d-day">${d.day}</div>
+        <div class="d-icon">${icon}</div>
+        <div class="d-desc">${desc.charAt(0).toUpperCase() + desc.slice(1)}</div>
+        <div class="d-temps">${d.tempF}°<span class="lo"> / ${d.tempC}°C</span></div>
+        <div class="d-pop"></div>
+      </div>`;
+    });
+    const dc = dollClass(w.type, w.tempF);
+    return `
+      <div class="detail-current">
+        <div class="detail-big-icon">${w.icon}</div>
+        <div>
+          <div><span class="detail-main-temp">${w.tempF}°F</span><span class="detail-alt-temp">${w.tempC}°C</span></div>
+          <div class="detail-cond-text">${w.condition}</div>
+        </div>
+      </div>
+      ${hourlyHtml}
+      <div class="detail-section-label">5-Day Forecast</div>
+      ${dailyHtml}
+      <div class="detail-section-label">Details</div>
+      <div class="stats-grid">
+        <div class="stat-tile"><div class="st-label">Feels Like</div><div class="st-value">${w.feelsF}°F / ${w.feelsC}°C</div></div>
+        <div class="stat-tile"><div class="st-label">Humidity</div><div class="st-value">${w.humidity}%</div></div>
+        <div class="stat-tile"><div class="st-label">Wind</div><div class="st-value">${w.windMph} mph</div></div>
+      </div>
+      <div class="detail-section-label">Shop for Today's Weather</div>
+      ${buildSponsorChips(w.type, w.tempF, 3, false, city.cityName, city.countryCode)}
+      <div class="detail-doll-wrap"><div class="doll doll-${dc}"></div></div>`;
+  }
+
+  async function openDetail(cityId) {
+    const city = cities.find(c => c.id === cityId);
+    if (!city || city.loading || city.error) return;
+    track('detail_view', {
+      city_name:      city.cityName,
+      country_code:   city.countryCode,
+      weather_bucket: city.data ? getWeatherBucket(city.data.type, city.data.tempF) : 'unknown',
+      temp_f:         city.data ? city.data.tempF : null,
+    });
+    document.getElementById('detailCityName').textContent    = city.data.cityName;
+    document.getElementById('detailCityCountry').textContent = city.data.countryCode;
+    document.getElementById('detailBody').innerHTML = '<div class="detail-loading">Loading extended forecast…</div>';
+    document.getElementById('detailOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    try {
+      const oneCall = await fetchOneCall(city.lat, city.lon);
+      document.getElementById('detailBody').innerHTML = buildDetailHTML(city, oneCall);
+    } catch {
+      document.getElementById('detailBody').innerHTML = buildDetailFallback(city);
+    }
+  }
+
+  function closeDetail() {
+    document.getElementById('detailOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // ── Analytics (Phase 9) ──────────────────────────────────────────────────
+
+  const IS_PWA       = window.matchMedia('(display-mode: standalone)').matches;
+  const IS_RETURNING = !!localStorage.getItem('sb_visited');
+  localStorage.setItem('sb_visited', '1');
+
+  function getConnectionType() {
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    return c ? (c.effectiveType || c.type || 'unknown') : 'unknown';
+  }
+
+  function track(event, params = {}) {
+    if (typeof gtag !== 'function') return;
+    gtag('event', event, {
+      is_pwa:         IS_PWA,
+      returning_user: IS_RETURNING,
+      connection:     getConnectionType(),
+      ...params,
+    });
+  }
+
+  // Delegated sponsor-chip click tracker
+  document.addEventListener('click', e => {
+    const chip = e.target.closest('[data-track-event]');
+    if (!chip) return;
+    track('sponsor_click', {
+      product_type:    chip.dataset.trackType  || 'weather',
+      product_label:   chip.dataset.trackLabel || '',
+      weather_bucket:  chip.dataset.trackBucket|| '',
+      city_name:       chip.dataset.trackCity  || '',
+    });
+  });
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+
+  async function init() {
+    track('app_open', {
+      city_count:    DEFAULTS.length,
+      returning_user: IS_RETURNING,
+      platform:      navigator.platform || 'unknown',
+    });
+
+    DEFAULTS.forEach(d => {
+      const id = nextId++;
+      cities.push({ id, cityName: d.cityName, countryCode: d.countryCode,
+                    lat: d.lat, lon: d.lon,
+                    data: null, forecast: null, quip: null,
+                    loading: true, error: false });
+    });
+    renderCards();
+
+    await Promise.all(cities.map(async city => {
+      try {
+        const [weatherRaw, forecastRaw] = await Promise.all([
+          fetchWeather(city.lat, city.lon),
+          fetchForecast(city.lat, city.lon),
+        ]);
+        city.data     = parseWeather(weatherRaw);
+        city.forecast = parseForecast(forecastRaw);
+        city.hourly   = parseHourly(forecastRaw);
+        city.quip     = generateQuip(city.forecast, city.data);
+        city.loading  = false;
+      } catch {
+        city.loading = false;
+        city.error   = true;
+      }
+      renderCards();
+    }));
+  }
+
+  init();
+
+  // Register service worker for offline app-shell caching (Phase 6)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+
+  // ── Feedback (Phase 9) ────────────────────────────────────────────────────
+  const WEB3FORMS_KEY = '56b73bc2-9876-46ef-96a7-79a25919877d';
+  let fbRating = 0;
+
+  function openFeedback() {
+    fbRating = 0;
+    document.getElementById('fbMessage').value = '';
+    document.getElementById('fbStatus').textContent = '';
+    document.getElementById('fbSubmit').disabled = false;
+    document.querySelectorAll('.fb-star').forEach(s => s.classList.remove('lit'));
+    document.getElementById('fbOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeFeedback() {
+    document.getElementById('fbOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function closeFeedbackIfBackdrop(e) {
+    if (e.target === document.getElementById('fbOverlay')) closeFeedback();
+  }
+
+  function setRating(v) {
+    fbRating = v;
+    document.querySelectorAll('.fb-star').forEach(s =>
+      s.classList.toggle('lit', parseInt(s.dataset.v) <= v)
+    );
+  }
+
+  async function submitFeedback() {
+    const msg = document.getElementById('fbMessage').value.trim();
+    if (!msg) { document.getElementById('fbStatus').textContent = 'Please write a message first.'; return; }
+    const btn = document.getElementById('fbSubmit');
+    const status = document.getElementById('fbStatus');
+    btn.disabled = true;
+    status.style.color = '#94a3b8';
+    status.textContent = 'Sending…';
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          subject: 'SunnyBabe Feedback' + (fbRating ? ' — ' + '★'.repeat(fbRating) : ''),
+          message: msg,
+          rating: fbRating ? fbRating + '/5' : 'Not rated',
+          from_name: 'SunnyBabe App',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        track('feedback_submit', { rating: fbRating, has_message: true });
+        status.style.color = '#4ade80';
+        status.textContent = 'Thanks! Feedback sent.';
+        setTimeout(closeFeedback, 1800);
+      } else {
+        throw new Error('failed');
+      }
+    } catch {
+      status.style.color = '#f87171';
+      status.textContent = 'Could not send — please try again.';
+      btn.disabled = false;
+    }
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeDetail(); closeFeedback(); }
+  });
+</script>
+</body>
+</html>

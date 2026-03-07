@@ -1,0 +1,14 @@
+[build]
+  publish = "."
+
+# Service worker must never be cached so phones always get the latest version
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# Icons can be cached aggressively
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

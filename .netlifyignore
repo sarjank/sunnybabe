@@ -1,0 +1,15 @@
+# Python server & dev files — not needed on Netlify
+WeatherAppCode.py
+make_icons.py
+deploy.py
+weatherAppPlan.md
+StartingWeatherApp_2_23_static.png
+
+# Node / Capacitor
+node_modules/
+ios/
+android/
+package-lock.json
+
+# Git
+.git/

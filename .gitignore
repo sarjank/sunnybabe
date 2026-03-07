@@ -1,0 +1,8 @@
+# API keys / secrets — never commit
+weatherAppKeyLinks.md
+
+# Claude Code session data
+.claude/
+
+# Node modules (if ever installed locally)
+node_modules/
