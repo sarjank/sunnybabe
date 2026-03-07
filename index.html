@@ -528,6 +528,28 @@
     .chip-price { color: #64748b; font-size: 0.67rem; }
     .chip-arr   { color: #475569; font-size: 0.68rem; }
 
+    /* ── Drag to reorder ──────────────────────────────────────────────────── */
+    .drag-handle {
+      cursor: grab;
+      color: rgba(255,255,255,0.25);
+      font-size: 1.1rem;
+      padding: 2px 6px 2px 0;
+      touch-action: none;
+      user-select: none;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .card.dragging {
+      opacity: 0.35;
+      transform: scale(0.96) !important;
+      transition: none;
+    }
+    .card.drag-over {
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.55), 0 14px 44px rgba(0,0,0,0.38);
+      transform: scale(1.02);
+    }
+
     /* ── Clickable card cursor (Phase 7) ──────────────────────────────────── */
     .card:not(.loading):not(.error-card) { cursor: pointer; }
 
@@ -1011,10 +1033,12 @@
         const chartHtml = renderMiniChart(city.forecast);
         const cardSponsored = buildSponsorChips(w.type, w.tempF, 1, true, city.cityName, city.countryCode);
         card.className = `card ${w.type}`;
+        card.dataset.cityId = city.id;
         card.onclick = () => openDetail(city.id);
         card.innerHTML = `
           <div class="card-glow"></div>
           <div class="card-top">
+            <span class="drag-handle" onpointerdown="dragStart(event,${city.id})">⠿</span>
             <div>
               <div class="city-name">${w.cityName}</div>
               <div class="city-country">${w.countryCode}</div>
@@ -1074,7 +1098,64 @@
     const city = cities.find(c => c.id === id);
     if (city) track('city_delete', { city_name: city.cityName, country_code: city.countryCode });
     cities = cities.filter(c => c.id !== id);
+    saveCities();
     renderCards();
+  }
+
+  // ── City persistence ──────────────────────────────────────────────────────
+
+  function saveCities() {
+    const toSave = cities
+      .filter(c => !c.loading && !c.error)
+      .map(({ cityName, countryCode, lat, lon }) => ({ cityName, countryCode, lat, lon }));
+    localStorage.setItem('sb_cities', JSON.stringify(toSave));
+  }
+
+  // ── Drag-to-reorder ───────────────────────────────────────────────────────
+
+  let _dragId   = null;
+  let _didDrag  = false;
+
+  function dragStart(e, cityId) {
+    e.stopPropagation();
+    _dragId  = cityId;
+    _didDrag = false;
+    e.currentTarget.closest('.card').classList.add('dragging');
+    document.addEventListener('pointermove', _dragMove, { passive: true });
+    document.addEventListener('pointerup',   _dragEnd);
+  }
+
+  function _dragMove(e) {
+    _didDrag = true;
+    document.querySelectorAll('.card.drag-over').forEach(c => c.classList.remove('drag-over'));
+    const el     = document.elementFromPoint(e.clientX, e.clientY);
+    const target = el && el.closest('[data-city-id]');
+    if (target && parseInt(target.dataset.cityId) !== _dragId) {
+      target.classList.add('drag-over');
+    }
+  }
+
+  function _dragEnd(e) {
+    document.removeEventListener('pointermove', _dragMove);
+    document.removeEventListener('pointerup',   _dragEnd);
+
+    const el       = document.elementFromPoint(e.clientX, e.clientY);
+    const target   = el && el.closest('[data-city-id]');
+    const targetId = target ? parseInt(target.dataset.cityId) : null;
+
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('dragging', 'drag-over'));
+
+    if (_didDrag && targetId && targetId !== _dragId) {
+      const srcIdx = cities.findIndex(c => c.id === _dragId);
+      const tgtIdx = cities.findIndex(c => c.id === targetId);
+      if (srcIdx !== -1 && tgtIdx !== -1) {
+        const [moved] = cities.splice(srcIdx, 1);
+        cities.splice(tgtIdx, 0, moved);
+        saveCities();
+        renderCards();
+      }
+    }
+    _dragId = null;
   }
 
   async function loadCity(lat, lon, cityName, countryCode) {
@@ -1082,7 +1163,7 @@
     const entry = { id, cityName, countryCode, lat, lon,
                     data: null, forecast: null, quip: null,
                     loading: true, error: false };
-    cities.push(entry);
+    cities.unshift(entry);
     renderCards();
 
     try {
@@ -1095,6 +1176,7 @@
       entry.hourly   = parseHourly(forecastRaw);
       entry.quip     = generateQuip(entry.forecast, entry.data);
       entry.loading  = false;
+      saveCities();
       track('city_add', {
         city_name:     cityName,
         country_code:  countryCode,
@@ -1506,13 +1588,14 @@
   // ── Boot ──────────────────────────────────────────────────────────────────
 
   async function init() {
+    const saved  = JSON.parse(localStorage.getItem('sb_cities') || 'null');
+    const toLoad = (saved && saved.length) ? saved : DEFAULTS;
     track('app_open', {
-      city_count:    DEFAULTS.length,
+      city_count:    toLoad.length,
       returning_user: IS_RETURNING,
       platform:      navigator.platform || 'unknown',
     });
-
-    DEFAULTS.forEach(d => {
+    toLoad.forEach(d => {
       const id = nextId++;
       cities.push({ id, cityName: d.cityName, countryCode: d.countryCode,
                     lat: d.lat, lon: d.lon,
