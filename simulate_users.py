@@ -124,9 +124,13 @@ async def simulate_user(browser, user_index: int) -> None:
         print(f"[user-{user_index}] Searched '{query}' — search_query_submitted will fire")
         await asyncio.sleep(1.5)  # cover 350ms debounce + API round trip
 
+        # Blur the search input so the suggestion dropdown closes before clicking Cancel
+        await page.locator("#cityInput").evaluate("el => el.blur()")
+        await asyncio.sleep(0.2)  # wait for the 150ms blur→hideSuggestions timeout
+
         # Close modal without adding
         await page.locator(".btn-cancel").click()
-        await page.wait_for_selector(".modal-overlay:not(.open)", timeout=5_000)
+        await page.wait_for_selector(".modal-overlay.open", state="hidden", timeout=5_000)
         await human_pause(1.0, 2.5)
 
         # Click a random sponsor chip
@@ -189,7 +193,7 @@ async def main(num_users: int, continuous: bool) -> None:
 
         await browser.close()
 
-    print("\nDone. Check GA4 → Reports → Realtime for events.")
+    print("\nDone. Check GA4 -> Reports -> Realtime for events.")
 
 
 if __name__ == "__main__":
