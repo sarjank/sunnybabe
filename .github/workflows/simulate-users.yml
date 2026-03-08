@@ -1,0 +1,48 @@
+name: Simulate GA4 Users
+
+on:
+  # Manual trigger from GitHub Actions UI — set user count before running
+  workflow_dispatch:
+    inputs:
+      users:
+        description: "Number of concurrent simulated users"
+        required: false
+        default: "5"
+        type: string
+
+  # Scheduled: every 6 hours (4×/day = ~240 Action-minutes/month, within free tier)
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright and Chromium
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+
+      - name: Run user simulation
+        run: |
+          USERS="${{ github.event.inputs.users || '5' }}"
+          echo "Simulating ${USERS} concurrent user(s) against ${{ env.TARGET }}"
+          python simulate_users.py --users "${USERS}"
+        env:
+          TARGET: "https://sarjank.github.io/sunnybabe/"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Simulation finished."
+          echo "Check GA4 Realtime: https://analytics.google.com"
