@@ -1234,6 +1234,7 @@
       return;
     }
     navigator.geolocation.getCurrentPosition(async pos => {
+      track('geolocation_granted');
       try {
         const { latitude: lat, longitude: lon } = pos.coords;
         const raw = await fetchWeather(lat, lon);
@@ -1248,6 +1249,7 @@
         const cta = document.getElementById('heroCta');
         cta.href = prod.url;
         cta.querySelector('.loc-hero-cta-label').textContent = prod.headline;
+        cta.onclick = () => track('hero_affiliate_click', { product_label: prod.label, bucket, city: w.cityName });
 
         const hero = document.getElementById('locationHero');
         hero.classList.remove('loading');
@@ -1258,12 +1260,13 @@
           Math.abs(c.lat - lat) < 0.05 && Math.abs(c.lon - lon) < 0.05
         );
         if (!alreadyOnBoard) {
-          loadCity(lat, lon, w.cityName, w.countryCode);
+          loadCity(lat, lon, w.cityName, w.countryCode, 'geolocation');
         }
       } catch {
         document.getElementById('locationHero').classList.add('hidden');
       }
-    }, () => {
+    }, err => {
+      track('geolocation_denied', { error_code: err.code });
       document.getElementById('locationHero').classList.add('hidden');
     }, { timeout: 8000 });
   }
@@ -1309,16 +1312,19 @@
       const srcIdx = cities.findIndex(c => c.id === _dragId);
       const tgtIdx = cities.findIndex(c => c.id === targetId);
       if (srcIdx !== -1 && tgtIdx !== -1) {
+        const srcName = cities[srcIdx].cityName;
+        const tgtName = cities[tgtIdx].cityName;
         const [moved] = cities.splice(srcIdx, 1);
         cities.splice(tgtIdx, 0, moved);
         saveCities();
         renderCards();
+        track('drag_reorder', { from_city: srcName, to_city: tgtName });
       }
     }
     _dragId = null;
   }
 
-  async function loadCity(lat, lon, cityName, countryCode) {
+  async function loadCity(lat, lon, cityName, countryCode, source = 'user_search') {
     const id    = nextId++;
     const entry = { id, cityName, countryCode, lat, lon,
                     data: null, forecast: null, quip: null,
@@ -1343,6 +1349,7 @@
         weather_bucket: getWeatherBucket(entry.data.type, entry.data.tempF),
         temp_f:        entry.data.tempF,
         condition:     entry.data.type,
+        source,
       });
     } catch {
       entry.loading = false;
@@ -1361,6 +1368,7 @@
     hideSuggestions();
     document.getElementById('modalOverlay').classList.add('open');
     setTimeout(() => document.getElementById('cityInput').focus(), 60);
+    track('modal_open', { modal_type: 'add_city' });
   }
 
   function closeModal() {
@@ -1393,6 +1401,7 @@
           document.getElementById('errorMsg').textContent = '';
           document.getElementById('addBtn').disabled      = false;
           hideSuggestions();
+          track('search_result_selected', { city_name: r.name, country: r.country });
         });
         list.appendChild(item);
       });
@@ -1417,6 +1426,7 @@
       try {
         const results = await geocodeSearch(query);
         showSuggestions(results);
+        track('search_query_submitted', { query_length: query.length, result_count: results.length });
       } catch {
         hideSuggestions();
         document.getElementById('errorMsg').textContent = 'Search failed — check your connection.';
@@ -1805,6 +1815,7 @@
     document.querySelectorAll('.fb-star').forEach(s => s.classList.remove('lit'));
     document.getElementById('fbOverlay').classList.add('open');
     document.body.style.overflow = 'hidden';
+    track('feedback_modal_open');
   }
 
   function closeFeedback() {
@@ -1821,6 +1832,7 @@
     document.querySelectorAll('.fb-star').forEach(s =>
       s.classList.toggle('lit', parseInt(s.dataset.v) <= v)
     );
+    track('feedback_rating_selected', { rating: v });
   }
 
   async function submitFeedback() {
@@ -1862,6 +1874,9 @@
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeDetail(); closeFeedback(); }
   });
+
+  // PWA install tracking
+  window.addEventListener('appinstalled', () => track('pwa_install'));
 </script>
 </body>
 </html>
