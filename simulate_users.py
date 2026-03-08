@@ -139,7 +139,7 @@ async def simulate_user(browser, user_index: int) -> None:
         if chip_count > 0:
             # Close any new tab the chip opens so the script doesn't hang
             context.on("page", lambda p: asyncio.create_task(p.close()))
-            await chips.nth(random.randint(0, chip_count - 1)).click()
+            await chips.nth(random.randint(0, chip_count - 1)).click(force=True)
             print(f"[user-{user_index}] Clicked sponsor chip — sponsor_click fired")
             await short_pause()
 
@@ -153,11 +153,17 @@ async def simulate_user(browser, user_index: int) -> None:
 
 # ── Batch runner ──────────────────────────────────────────────────────────────
 
+MAX_CONCURRENT = 5  # max simultaneous Chromium instances (safe for most machines)
+
 async def run_batch(browser, num_users: int) -> None:
-    print(f"\n--- Launching {num_users} user(s) ---")
-    await asyncio.gather(*[
-        simulate_user(browser, i + 1) for i in range(num_users)
-    ])
+    print(f"\n--- Launching {num_users} user(s) (max {MAX_CONCURRENT} at a time) ---")
+    sem = asyncio.Semaphore(MAX_CONCURRENT)
+
+    async def throttled(i):
+        async with sem:
+            await simulate_user(browser, i + 1)
+
+    await asyncio.gather(*[throttled(i) for i in range(num_users)])
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
