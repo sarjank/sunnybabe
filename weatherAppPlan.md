@@ -272,6 +272,69 @@
 
 ---
 
+---
+
+## Phase 10 — GA4 Analytics & User Simulation (COMPLETE)
+
+### 10A — Google Analytics 4 Setup
+- Measurement ID: `G-VZWZNRC9R6` (web data stream, `sarjank.github.io/sunnybabe`)
+- Previous ID `G-QCKZPXMK4C` returned 404 from Google's CDN — replaced with fresh stream
+- Script loaded async in `<head>` with `send_page_view: true`
+
+### 10B — Event Coverage
+Every meaningful user interaction tracked with `track()` helper (wraps `gtag('event', ...)`).
+All events include `is_pwa`, `returning_user`, and `connection` fields automatically.
+
+| Event | Trigger |
+|---|---|
+| `app_open` | Page load — includes `city_count`, `platform` |
+| `geolocation_granted` | User allows location access |
+| `geolocation_denied` | User blocks / times out — includes `error_code` |
+| `hero_impression` | Location hero banner resolves — includes `bucket`, `city`, `product` |
+| `hero_affiliate_click` | Hero CTA tapped — includes `product_label`, `bucket`, `city` |
+| `modal_open` | Add City modal opened |
+| `search_query_submitted` | Debounced geocode fires — includes `query_length`, `result_count` |
+| `search_result_selected` | City picked from dropdown — includes `city_name`, `country` |
+| `city_add` | Card created — includes `source` (`user_search` / `geolocation`), weather context |
+| `city_delete` | Card removed |
+| `detail_view` | Card tapped to open detail panel |
+| `drag_reorder` | Card dragged to new position — includes `from_city`, `to_city` |
+| `sponsor_click` | Affiliate chip clicked — includes `product_type`, `product_label`, `weather_bucket` |
+| `feedback_modal_open` | Feedback FAB tapped |
+| `feedback_rating_selected` | Star rating chosen — includes `rating` (1–5) |
+| `feedback_submit` | Feedback successfully sent |
+| `pwa_install` | App installed to home screen (`appinstalled` event) |
+
+### 10C — User Simulation Tool (`simulate_users.py`)
+Playwright headless Chromium script that fires real GA4 events through a genuine browser session.
+
+**Three modes:**
+```
+python simulate_users.py               # 3 users, GA4 verify
+python simulate_users.py --users 20   # 20 users, load test (5 at a time)
+python simulate_users.py --continuous # loops forever, 1-3 users, 1-5 min gaps
+```
+
+**Per-session flow:** page load → detail_view → modal_open → search_query_submitted → sponsor_click
+
+**Browser diversity:** 5 user agents, 5 locales, 6 timezones, 5 viewports — randomised per session
+
+**Concurrency cap:** `MAX_CONCURRENT = 5` (semaphore prevents OOM on large `--users` counts)
+
+**One-time local setup:**
+```bash
+pip install playwright
+playwright install chromium
+```
+
+### 10D — GitHub Actions Automation (`.github/workflows/simulate-users.yml`)
+- Runs every 6 hours (`cron: "0 */6 * * *"`) — 4×/day = ~240 Action-min/month (within free tier)
+- Manual trigger via `workflow_dispatch` with configurable user count (default 5)
+- Runner: `ubuntu-latest` — different Azure IP each run for geographic diversity
+- Uses `playwright install chromium --with-deps` for Linux dependency resolution
+
+---
+
 | File | Purpose |
 |---|---|
 | `index.html` | Full app — HTML, CSS, JS (all phases) |
@@ -285,3 +348,5 @@
 | `.netlifyignore` | Excludes non-web files from deploy |
 | `capacitor.config.json` | Capacitor iOS config |
 | `package.json` | Node deps (Capacitor) |
+| `simulate_users.py` | Playwright GA4 user simulation (local + CI) |
+| `.github/workflows/simulate-users.yml` | Scheduled GitHub Actions automation |
