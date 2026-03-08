@@ -1252,6 +1252,14 @@
         const hero = document.getElementById('locationHero');
         hero.classList.remove('loading');
         track('hero_impression', { bucket, city: w.cityName, product: prod.label });
+
+        // Add GPS city as the first card if not already on the board
+        const alreadyOnBoard = cities.find(c =>
+          Math.abs(c.lat - lat) < 0.05 && Math.abs(c.lon - lon) < 0.05
+        );
+        if (!alreadyOnBoard) {
+          loadCity(lat, lon, w.cityName, w.countryCode);
+        }
       } catch {
         document.getElementById('locationHero').classList.add('hidden');
       }
