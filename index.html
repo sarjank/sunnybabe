@@ -454,6 +454,93 @@
     .doll-cloudy { background-position:   -8px -122px; }
     .doll-hot    { background-position: -135px -122px; }
 
+    /* ── Location Hero Banner ─────────────────────────────────────────────── */
+    .loc-hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin: 1.4rem 2rem 0;
+      max-width: 1300px;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 1.25rem 1.75rem;
+      background: linear-gradient(135deg, rgba(91,164,245,0.08) 0%, rgba(255,255,255,0.03) 100%);
+      border: 1px solid rgba(91,164,245,0.18);
+      border-left: 3px solid #5ba4f5;
+      border-radius: 14px;
+      backdrop-filter: blur(10px);
+      transition: opacity 0.3s;
+    }
+    .loc-hero.hidden { display: none; }
+    .loc-hero.loading { opacity: 0.5; pointer-events: none; }
+
+    .loc-hero-left { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+
+    .loc-hero-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #5ba4f5;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .loc-hero-city {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .loc-hero-meta {
+      font-size: 0.82rem;
+      color: #94a3b8;
+      margin-top: 0.1rem;
+    }
+
+    .loc-hero-cta {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 0.65rem 1.2rem;
+      border-radius: 10px;
+      letter-spacing: 0.02em;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 2px 12px rgba(245,158,11,0.3);
+      white-space: nowrap;
+    }
+    .loc-hero-cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(245,158,11,0.45);
+    }
+    .loc-hero-cta-inner { display: flex; flex-direction: column; align-items: flex-start; gap: 0.05rem; }
+    .loc-hero-cta-label { font-size: 0.68rem; font-weight: 500; opacity: 0.85; }
+    .loc-hero-cta-product { font-size: 0.85rem; font-weight: 700; }
+    .loc-hero-arr { font-size: 1rem; opacity: 0.8; }
+
+    @media (max-width: 860px) {
+      .loc-hero { margin: 1rem 1.4rem 0; padding: 1rem 1.25rem; }
+    }
+    @media (max-width: 520px) {
+      .loc-hero {
+        flex-direction: column;
+        align-items: flex-start;
+        margin: 0.8rem 0.9rem 0;
+        padding: 1rem 1.1rem;
+        gap: 0.9rem;
+      }
+      .loc-hero-cta { width: 100%; justify-content: space-between; }
+    }
+
     /* ── Responsive: tablet (≤ 860px) ────────────────────────────────────── */
     @media (max-width: 860px) {
       header { padding: 1.2rem 1.4rem 1rem; }
@@ -533,9 +620,10 @@
       cursor: grab;
       color: rgba(255,255,255,0.25);
       font-size: 1.1rem;
-      padding: 2px 6px 2px 0;
+      padding: 2px 10px 2px 0; /* wider tap target */
       touch-action: none;
       user-select: none;
+      -webkit-user-select: none;
       line-height: 1;
       flex-shrink: 0;
     }
@@ -710,6 +798,22 @@
   </button>
 </header>
 
+<!-- Location hero banner -->
+<div class="loc-hero loading" id="locationHero">
+  <div class="loc-hero-left">
+    <div class="loc-hero-label">📍 Your Location</div>
+    <div class="loc-hero-city" id="heroCity">Detecting…</div>
+    <div class="loc-hero-meta" id="heroMeta"></div>
+  </div>
+  <a class="loc-hero-cta" id="heroCta" href="#" target="_blank" rel="noopener sponsored">
+    <div class="loc-hero-cta-inner">
+      <span class="loc-hero-cta-label">Recommended for today</span>
+      <span class="loc-hero-cta-product" id="heroProduct">…</span>
+    </div>
+    <span class="loc-hero-arr">→</span>
+  </a>
+</div>
+
 <div class="grid" id="cityGrid"></div>
 
 <div class="modal-overlay" id="modalOverlay">
@@ -780,9 +884,9 @@
   let debounceTimer    = null;
 
   const DEFAULTS = [
-    { cityName: 'Mombasa',   countryCode: 'KE', lat: -4.0435,  lon:  39.6682 },
-    { cityName: 'Milwaukee', countryCode: 'US', lat:  43.0389,  lon: -87.9065 },
-    { cityName: 'New York',  countryCode: 'US', lat:  40.7128,  lon: -74.0060 },
+    { cityName: 'New York',  countryCode: 'US', lat:  40.7128, lon: -74.0060 },
+    { cityName: 'Bangalore', countryCode: 'IN', lat:  12.9716, lon:  77.5946 },
+    { cityName: 'Chicago',   countryCode: 'US', lat:  41.8781, lon: -87.6298 },
   ];
 
   // ── Doll sprite selection ─────────────────────────────────────────────────
@@ -1111,21 +1215,69 @@
     localStorage.setItem('sb_cities', JSON.stringify(toSave));
   }
 
+  // ── Location Hero Banner ──────────────────────────────────────────────────
+
+  const HERO_PRODUCTS = {
+    stormy: { label: 'Windproof Umbrella',       emoji: '🌂', url: 'https://www.amazon.com/s?k=windproof+compact+umbrella+women&tag=phoenixsj-20', headline: 'Storm incoming today' },
+    rainy:  { label: 'Compact Travel Umbrella',  emoji: '☂️',  url: 'https://www.amazon.com/s?k=compact+travel+umbrella+women&tag=phoenixsj-20',   headline: 'Rain expected today' },
+    snowy:  { label: "Women's Winter Beanie",    emoji: '🧣', url: 'https://www.amazon.com/s?k=women+winter+beanie+hat+warm&tag=phoenixsj-20',    headline: 'Bundle up today' },
+    cold:   { label: "Women's Winter Beanie",    emoji: '🧤', url: 'https://www.amazon.com/s?k=women+winter+beanie+hat&tag=phoenixsj-20',          headline: 'Freezing temps today' },
+    chilly: { label: 'Cozy Fleece Pullover',     emoji: '🧥', url: 'https://www.amazon.com/s?k=women+fleece+pullover+cozy&tag=phoenixsj-20',      headline: 'Chilly out today' },
+    mild:   { label: 'Lightweight Layer',        emoji: '🧤', url: 'https://www.amazon.com/s?k=women+lightweight+cardigan&tag=phoenixsj-20',       headline: 'Perfect weather today' },
+    warm:   { label: 'SPF 50 Sunscreen',         emoji: '🧴', url: 'https://www.amazon.com/s?k=womens+sunscreen+spf50+face&tag=phoenixsj-20',     headline: 'UV is elevated today' },
+    hot:    { label: 'Mineral Sunscreen SPF 50', emoji: '☀️', url: 'https://www.amazon.com/s?k=mineral+sunscreen+spf50+women&tag=phoenixsj-20',   headline: 'High UV — stay protected' },
+  };
+
+  function initLocationHero() {
+    if (!navigator.geolocation) {
+      document.getElementById('locationHero').classList.add('hidden');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        const raw = await fetchWeather(lat, lon);
+        const w   = parseWeather(raw);
+        const bucket = getWeatherBucket(w.type, w.tempF);
+        const prod   = HERO_PRODUCTS[bucket] || HERO_PRODUCTS.mild;
+
+        document.getElementById('heroCity').textContent    = w.cityName + (w.countryCode ? ', ' + w.countryCode : '');
+        document.getElementById('heroMeta').textContent    = `${w.tempF}°F · ${w.condition}`;
+        document.getElementById('heroProduct').textContent = prod.emoji + ' ' + prod.label;
+
+        const cta = document.getElementById('heroCta');
+        cta.href = prod.url;
+        cta.querySelector('.loc-hero-cta-label').textContent = prod.headline;
+
+        const hero = document.getElementById('locationHero');
+        hero.classList.remove('loading');
+        track('hero_impression', { bucket, city: w.cityName, product: prod.label });
+      } catch {
+        document.getElementById('locationHero').classList.add('hidden');
+      }
+    }, () => {
+      document.getElementById('locationHero').classList.add('hidden');
+    }, { timeout: 8000 });
+  }
+
   // ── Drag-to-reorder ───────────────────────────────────────────────────────
 
   let _dragId   = null;
   let _didDrag  = false;
 
   function dragStart(e, cityId) {
+    e.preventDefault();                              // stop browser scroll/pan taking over
     e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId); // keep events flowing even after finger leaves handle
     _dragId  = cityId;
     _didDrag = false;
     e.currentTarget.closest('.card').classList.add('dragging');
-    document.addEventListener('pointermove', _dragMove, { passive: true });
+    document.addEventListener('pointermove', _dragMove);
     document.addEventListener('pointerup',   _dragEnd);
   }
 
   function _dragMove(e) {
+    e.preventDefault();                             // prevent page scroll while dragging
     _didDrag = true;
     document.querySelectorAll('.card.drag-over').forEach(c => c.classList.remove('drag-over'));
     const el     = document.elementFromPoint(e.clientX, e.clientY);
@@ -1624,6 +1776,7 @@
   }
 
   init();
+  initLocationHero();
 
   // Register service worker for offline app-shell caching (Phase 6)
   if ('serviceWorker' in navigator) {
